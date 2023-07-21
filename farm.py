@@ -4,6 +4,7 @@ from random import randint
 from threading import Thread
 import os
 import math
+import keyboard
 
 global money
 money = 0
@@ -38,6 +39,54 @@ def progress_from_percentage(percentage: int) -> str:
     return bar
 
 
+class inputs(Thread):
+    currentMessage = ""
+    previous_keys = []
+
+    def __init__(self):
+        Thread.__init__(self)   
+
+    def run(self):
+        while running:
+            self.updateKey()
+
+    def updateKey(self):
+        event = keyboard.read_event()
+
+        special_chars = {"space": " "}
+        blank_chars = ["command", "ctrl", "esc", "alt"]
+
+        key = event.name
+
+        if (event.event_type == "up"):
+            # if a key is up then remove it from the previously pressed key array
+            
+            if key in self.previous_keys:
+                self.previous_keys.remove(key)
+
+            return
+
+        if key in self.previous_keys:
+            # if the key is held down
+            # return to not have duplicate keys
+            return
+
+        if (event.event_type == "down"):
+            if key not in self.previous_keys:
+                self.previous_keys.append(key)
+
+        if key == "delete" and len(self.currentMessage) >= 0:
+            self.currentMessage = self.currentMessage[:-1]
+
+        elif key in special_chars:
+            self.currentMessage += special_chars[key]
+
+        elif key in blank_chars:
+            return
+        
+        else:
+            self.currentMessage += key
+
 class farm(Thread):
     def __init__(self, name):
         Thread.__init__(self)
@@ -48,7 +97,7 @@ class farm(Thread):
         self.delay = randint(1, 100) / 10 # in seconds
         self.number_of_runs = 0
         logging.info(f"{self.name} started with level: {self.level}, delay: {self.delay}")
-    
+
     def run(self):
         global running
         while running:
@@ -88,6 +137,8 @@ class run(Thread):
     runtime = 10 # in s
     update_delay = 0.1 # in s
     def __init__(self):
+        self.inputs = inputs()
+        self.inputs.start()
         values = [x for x in range(10)]
         self.threads = []
         for value in values:
@@ -106,7 +157,18 @@ class run(Thread):
     def output(self):
         for thread in self.threads:
             thread.outputValues()
-
+    
+    def checkInput(self):
+        if len(self.inputs.currentMessage) == 0:
+            return
+        
+        last_digit = self.inputs.currentMessage[-1]
+        if not last_digit.isdigit():
+            return
+        last_digit = int(last_digit)
+        if (last_digit >= 0 and last_digit < len(self.threads)):
+            self.inputs.currentMessage = ""
+            self.threads[last_digit].increase_level(output=True)
 
 if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
@@ -119,6 +181,8 @@ if __name__ == "__main__":
     while ((perf_counter()-start_time) < main.runtime):
         os.system("clear")
         main.output()
+        print(main.inputs.currentMessage)
+        main.checkInput()
         sleep(main.update_delay)
 
     main.end()
