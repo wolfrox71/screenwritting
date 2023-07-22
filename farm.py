@@ -94,6 +94,7 @@ class farm(Thread):
         self.name = name
         self.level = randint(1,5)
         self.level_percent = 1.10
+        self.upgrade_price = self.level * 10
         self.delay = randint(1, 100) / 10 # in seconds
         self.number_of_runs = 0
         logging.info(f"{self.name} started with level: {self.level}, delay: {self.delay}")
@@ -107,10 +108,12 @@ class farm(Thread):
 
     def one_run(self):
         global money
+        
         self.number_of_runs += 1
         self.money_to_add = self.level * self.level_percent
         self.startTime = perf_counter()
         self.endTime = self.startTime + self.delay
+        
         sleep(self.delay) # wait the delay
         money += self.money_to_add
         
@@ -118,10 +121,11 @@ class farm(Thread):
     def outputValues(self):
         self.progress_percent = (self.endTime - perf_counter())*100/self.delay
         self.progress_time = (self.endTime - perf_counter())
-        logging.info(f"{self.name}      level: {self.level}     {progress_from_percentage(self.progress_percent)}       {self.number_of_runs}       {self.delay:.2f}        {self.money_to_add:.1f}     {self.progress_percent}")
+        logging.info(f"{self.name}   level: {str(self.level).zfill(3)}     {progress_from_percentage(self.progress_percent)}       {str(self.number_of_runs).zfill(3)}    {self.money_to_add:.1f}     {self.upgrade_price}")
 
     def increase_level(self, output=False):
         self.level += 1
+        self.upgrade_price = 10 * self.level
         if (output):
             logging.info(f"{self.name} increase to {self.level}")
 
@@ -134,7 +138,7 @@ class count(Thread):
         return
 
 class run(Thread):
-    runtime = 10 # in s
+    runtime = 50 # in s
     update_delay = 0.1 # in s
     def __init__(self):
         self.inputs = inputs()
@@ -159,6 +163,7 @@ class run(Thread):
             thread.outputValues()
     
     def checkInput(self):
+        global money
         if len(self.inputs.currentMessage) == 0:
             return
         
@@ -168,7 +173,10 @@ class run(Thread):
         last_digit = int(last_digit)
         if (last_digit >= 0 and last_digit < len(self.threads)):
             self.inputs.currentMessage = ""
-            self.threads[last_digit].increase_level(output=True)
+
+            if (self.threads[last_digit].upgrade_price <= money):
+                self.threads[last_digit].increase_level()
+                money -= self.threads[last_digit].upgrade_price
 
 if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
@@ -181,10 +189,10 @@ if __name__ == "__main__":
     while ((perf_counter()-start_time) < main.runtime):
         os.system("clear")
         main.output()
-        print(main.inputs.currentMessage)
+        print(f"{money:.1f}")
         main.checkInput()
         sleep(main.update_delay)
 
     main.end()
 
-    print(money)
+    print(f"Ending Money: £{money:.1f}")
