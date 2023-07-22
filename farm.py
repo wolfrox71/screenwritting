@@ -16,20 +16,28 @@ class UpgradeType(Enum):
     value = 2
 
     def next(self):
+        """Return the next enum value (loops round if you get to the end of the values)"""
         members = list(self.__class__)
         index = members.index(self) + 1
 
         if index >= len(members):
+            # loop round if at the end of the values
             index = 0
+        
+        # return the next value
         return members[index]
     
 
     def previous(self):
+        """Return the previous enum value (loops round if you get to the start of the values)"""
         members = list(self.__class__)
         index = members.index(self) - 1
 
         if index < len(members):
+            # loop round if at the start of the values
             index = len(members) -1
+
+        # return the value at that index position
         return members[index]
 
 def UP(number_of_lines: int) -> str:
@@ -115,12 +123,12 @@ class farm(Thread):
         self.value = None
         self.name = name
         self.level = randint(1,5)
-        self.level_percent = 1.10
+        self.level_percent = 1.10 # the ammount that the level increases by when you upgrade it
         self.upgrade_price = self.level * 10
         self.delay = randint(1, 100) / 10 # in seconds
         self.number_of_runs = 0
-        self.minimum_delay = 1.0
-        self.delay_reduction = 0.9
+        self.minimum_delay = 1.0 # the minimum delay in seconds
+        self.delay_reduction = 0.9 # the ammount that the delay reduces by when an upgrade is used
         logging.info(f"{self.name} started with level: {self.level}, delay: {self.delay}")
 
     def run(self):
@@ -187,43 +195,68 @@ class run(Thread):
     def end(self):
         global running
         logging.info("Stopping")
+        # stops the loop running in each of the threads
         running = False
         # go through each thread and make sure its ended
         for thread in self.threads:
+            # wait for each thread to end
             thread.join()
+
+        # and output that all the treads have stopped
         logging.info("Everything Stopped")
 
     def output(self):
+        # set the labels for the output values
         logging.info(f"Name   Level                              reps   add     price    delay")
         for thread in self.threads:
             thread.outputValues()
     
     def checkInput(self):
         global money
+        # if no values have been pressed
         if len(self.inputs.currentMessage) == 0:
+            # return from the function early
             return
         
-        last_digit = self.inputs.currentMessage[-1]
-        if last_digit == "g":
+        # get the last character that was pressed by the player 
+        last_char = self.inputs.currentMessage[-1]
+        
+        # if the last character was to swap update type
+        if last_char == "g":
+            # reset the current message as the character has been used
             self.inputs.currentMessage = ""
+            # change the update type to the next value in the enum and loop if this is the end value
             self.update_type = self.update_type.next()
+            # and return from the loop
             return
 
-        if not last_digit.isdigit():
+
+        # if the last character is not a number and was not used by the previous selection statements
+        if not last_char.isdigit():
+            # leave the function
             return
         
-        last_digit = int(last_digit)
+        # get the last pressed character as an int
+        last_digit = int(last_char)
         
+        # if the digit is within the threads
         if (last_digit >= 0 and last_digit < len(self.threads)):
+            # reset the message as to not repeatedly call
             self.inputs.currentMessage = ""
 
+            # check if the player has enough money for this 
             if (self.threads[last_digit].upgrade_price <= money):
+                # if the upgrade type is a reduction in delay
                 if self.update_type == UpgradeType.delay:
+                    # reduce the delay of the selected farm
                     self.threads[last_digit].reduce_delay()
 
+                # if the upgrade type is an increase in value
                 elif self.update_type == UpgradeType.value:
+                    # increase the level of the current farm
                     self.threads[last_digit].increase_level()
                 
+                # reduce the money of the player by the upgrade price
                 money -= self.threads[last_digit].upgrade_price
 
 if __name__ == "__main__":
@@ -234,15 +267,23 @@ if __name__ == "__main__":
     main = run()
 
     start_time = perf_counter()
+    # while the run time has not expired
     while ((perf_counter()-start_time) < main.runtime):
+        # clear the screen
         os.system("clear")
+        # output the current state of the program
         main.output()
+        # and the players money
         print(f"{money:.1f}")
+        # and upgrade type
         print(main.update_type)
+        # check if an input has changed
         main.checkInput()
+        # and wait until the next update tick
         sleep(main.update_delay)
 
     main.end()
 
     print(f"Ending Money: £{money:.1f}")
+    # call an input to clear stdin to not paste to the terminal once python ends
     input("E")
